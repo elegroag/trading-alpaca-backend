@@ -1,0 +1,47 @@
+<!-- Componente: Formulario de Orden -->
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header bg-black border-secondary">
+        <h5 class="mb-0">📝 Nueva Orden</h5>
+    </div>
+    <div class="card-body">
+        <form id="order-form">
+            <div class="mb-3">
+                <label for="symbol" class="form-label">Símbolo</label>
+                <input type="text" class="form-control bg-dark text-light border-secondary" id="symbol"
+                    placeholder="AAPL" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="qty" class="form-label">Cantidad</label>
+                <input type="number" class="form-control bg-dark text-light border-secondary" id="qty" placeholder="10"
+                    min="1" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="side" class="form-label">Tipo</label>
+                <select class="form-select bg-dark text-light border-secondary" id="side" required>
+                    <option value="buy">Comprar</option>
+                    <option value="sell">Vender</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="order_type" class="form-label">Orden</label>
+                <select class="form-select bg-dark text-light border-secondary" id="order_type" required>
+                    <option value="market">Mercado</option>
+                    <option value="limit">Límite</option>
+                </select>
+            </div>
+
+            <div class="mb-3" id="limit-price-group" style="display: none;">
+                <label for="limit_price" class="form-label">Precio Límite</label>
+                <input type="number" class="form-control bg-dark text-light border-secondary" id="limit_price"
+                    placeholder="150.00" step="0.01">
+            </div>
+
+            <button type="submit" class="btn btn-success w-100">
+                Enviar Orden
+            </button>
+        </form>
+    </div>
+</div>

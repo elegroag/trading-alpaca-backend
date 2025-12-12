@@ -1,0 +1,78 @@
+[project]
+name = "trading-swing-flask"
+version = "1.0.0"
+description = "Aplicación web profesional para trading swing con Flask, WebSocket y Alpaca API"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Developer"}
+]
+keywords = ["trading", "flask", "websocket", "alpaca", "swing-trading"]
+
+dependencies = [
+    "flask>=3.0.0",
+    "flask-socketio>=5.3.5",
+    "python-socketio>=5.10.0",
+    "alpaca-py>=0.43.2",
+    "python-dotenv>=1.0.0",
+    "eventlet>=0.33.3",
+    "requests>=2.31.0",
+    "pandas>=2.1.4",
+    "numpy>=1.26.2",
+    "alpaca-trade-api>=3.2.0",
+    "flask-cors>=6.0.1",
+    "pymongo>=4.15.5",
+    "bcrypt>=5.0.0",
+    "cryptography>=46.0.3",
+    "pyjwt>=2.10.1",
+    "ta>=0.11.0",
+    "xgboost>=3.1.2",
+    "scikit-learn>=1.7.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.12.0",
+    "isort>=5.13.0",
+    "flake8>=6.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["controllers", "models", "services"]
+py-modules = ["app", "config"]
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+include = '\\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --cov=. --cov-report=html"

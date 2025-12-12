@@ -1,0 +1,216 @@
+<!-- ======================================================================== -->
+<!-- templates/dashboard.html -->
+<!-- ======================================================================== -->
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Trading Swing{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Columna Izquierda: Información de Cuenta -->
+    <div class="col-lg-4">
+        <!-- Información de Cuenta -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header bg-black border-secondary">
+                <h5 class="mb-0">💼 Información de Cuenta</h5>
+            </div>
+            <div class="card-body" id="account-info">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-light" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de Orden -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header bg-black border-secondary">
+                <h5 class="mb-0">📝 Nueva Orden</h5>
+            </div>
+            <div class="card-body">
+                <form id="order-form">
+                    <div class="mb-3">
+                        <label for="symbol" class="form-label">Símbolo</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="symbol"
+                            placeholder="AAPL" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="qty" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="qty"
+                            placeholder="10" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="side" class="form-label">Tipo</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="side" required>
+                            <option value="buy">Comprar</option>
+                            <option value="sell">Vender</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="order_type" class="form-label">Orden</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="order_type" required>
+                            <option value="market">Mercado</option>
+                            <option value="limit">Límite</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="limit-price-group" style="display: none;">
+                        <label for="limit_price" class="form-label">Precio Límite</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="limit_price"
+                            placeholder="150.00" step="0.01">
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100">
+                        Enviar Orden
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Formulario Swing Trade -->
+        <div class="card bg-dark border-secondary">
+            <div class="card-header bg-black border-secondary">
+                <h5 class="mb-0">🎯 Swing Trade</h5>
+            </div>
+            <div class="card-body">
+                <form id="swing-trade-form">
+                    <div class="mb-3">
+                        <label for="swing-symbol" class="form-label">Símbolo</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" id="swing-symbol"
+                            placeholder="AAPL" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="swing-qty" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="swing-qty"
+                            placeholder="10" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="entry-price" class="form-label">Precio Entrada</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="entry-price"
+                            placeholder="150.00" step="0.01" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tp-price" class="form-label">Take Profit</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="tp-price"
+                            placeholder="160.00" step="0.01" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="sl-price" class="form-label">Stop Loss</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" id="sl-price"
+                            placeholder="145.00" step="0.01" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        Crear Swing Trade
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna Central y Derecha: Gráfico y Datos -->
+    <div class="col-lg-8">
+        <!-- Selector de Símbolo y Gráfico -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header bg-black border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📊 Gráfico</h5>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
+                        id="chart-symbol" placeholder="Símbolo" style="width: 100px;">
+                    <select class="form-select form-select-sm bg-dark text-light border-secondary" id="chart-timeframe"
+                        style="width: 80px;">
+                        <option value="1Min">1Min</option>
+                        <option value="5Min">5Min</option>
+                        <option value="1H">1H</option>
+                        <option value="1D" selected>1D</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-light" id="load-chart">Cargar</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="price-chart" height="80"></canvas>
+            </div>
+        </div>
+
+        <!-- Posiciones Abiertas -->
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header bg-black border-secondary">
+                <h5 class="mb-0">📈 Posiciones Abiertas</h5>
+            </div>
+            <div class="card-body">
+                <div id="positions-list">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Órdenes Abiertas -->
+        <div class="card bg-dark border-secondary">
+            <div class="card-header bg-black border-secondary">
+                <h5 class="mb-0">📋 Órdenes Abiertas</h5>
+            </div>
+            <div class="card-body">
+                <div id="orders-list">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Estrategia Swing Automática -->
+        <div class="card bg-dark border-secondary mt-3">
+            <div class="card-header bg-black border-secondary d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">🤖 Estrategia Swing</h5>
+                <span class="badge bg-info">Automático</span>
+            </div>
+            <div class="card-body">
+                <form id="swing-scan-form" class="mb-3">
+                    <div class="mb-2">
+                        <label for="swing-scan-tickers" class="form-label">Tickers (separados por coma)</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary"
+                            id="swing-scan-tickers" placeholder="AAPL,MSFT,AMZN,NVDA,META">
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="swing-scan-execute">
+                        <label class="form-check-label" for="swing-scan-execute">
+                            Ejecutar órdenes (usa la cuenta actual)
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-outline-info w-100" id="swing-scan-btn">
+                        Ejecutar Estrategia Swing
+                    </button>
+                </form>
+                <div id="swing-scan-results" class="small text-muted">
+                    <em>Aún no se ha ejecutado la estrategia.</em>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast para notificaciones -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="notification-toast" class="toast" role="alert">
+        <div class="toast-header">
+            <strong class="me-auto">Notificación</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toast-message"></div>
+    </div>
+</div>
+{% endblock %}

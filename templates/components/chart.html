@@ -1,0 +1,21 @@
+<!-- Componente: Gráfico de Precios -->
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header bg-black border-secondary d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">📊 Gráfico</h5>
+        <div class="d-flex gap-2">
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary"
+                id="chart-symbol" placeholder="Símbolo" style="width: 100px;">
+            <select class="form-select form-select-sm bg-dark text-light border-secondary" id="chart-timeframe"
+                style="width: 80px;">
+                <option value="1Min">1Min</option>
+                <option value="5Min">5Min</option>
+                <option value="1H">1H</option>
+                <option value="1D" selected>1D</option>
+            </select>
+            <button class="btn btn-sm btn-outline-light" id="load-chart">Cargar</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <canvas id="price-chart"></canvas>
+    </div>
+</div>

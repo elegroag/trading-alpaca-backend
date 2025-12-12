@@ -1,0 +1,42 @@
+<!-- ======================================================================== -->
+<!-- templates/error.html -->
+<!-- ======================================================================== -->
+{% extends "base.html" %}
+
+{% block title %}Error - Trading Swing{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card bg-dark border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">⚠️ Error de Configuración</h4>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">Se encontraron los siguientes errores:</p>
+                <ul class="list-group list-group-flush">
+                    {% for error in errors %}
+                    <li class="list-group-item bg-dark text-light border-secondary">
+                        {{ error }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="mt-4">
+                    <h5>Solución:</h5>
+                    <ol class="text-muted">
+                        <li>Crea un archivo <code>.env</code> en la raíz del proyecto</li>
+                        <li>Agrega tus credenciales de Alpaca:
+                            <pre class="bg-black p-2 mt-2 rounded">
+ALPACA_API_KEY=tu_api_key
+ALPACA_SECRET_KEY=tu_secret_key
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+SECRET_KEY=tu_secret_key_flask</pre>
+                        </li>
+                        <li>Reinicia la aplicación</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
