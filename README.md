@@ -1,14 +1,12 @@
 # 📈 Trading Swing App - Flask + WebSocket + Alpaca API
 
-Aplicación web profesional para trading swing desarrollada con Flask, Jinja2, WebSocket y integración con Alpaca API. Sigue principios SOLID y patrones de diseño modernos.
+Backend API profesional para trading swing desarrollado con Flask, WebSocket e integración con Alpaca API. Sigue principios SOLID y patrones de diseño modernos.
 
 ## 🎯 Características
 
-- **Visualización en Tiempo Real**: Gráficos interactivos con Chart.js
 - **WebSocket**: Actualizaciones instantáneas de precios, posiciones y órdenes
 - **Trading Swing**: Sistema completo con entry, take profit y stop loss
 - **Gestión de Órdenes**: Creación, cancelación y monitoreo de órdenes
-- **Dashboard Completo**: Información de cuenta, posiciones abiertas y órdenes activas
 - **Arquitectura Limpia**: Código orientado a objetos con patrones SOLID
 - **Paper Trading**: Integración con Alpaca Paper Trading API para practicar sin riesgo
 
@@ -17,11 +15,6 @@ Aplicación web profesional para trading swing desarrollada con Flask, Jinja2, W
 La aplicación sigue una arquitectura en capas basada en principios SOLID:
 
 ```
-┌─────────────────────────────────────────────┐
-│           Presentation Layer                │
-│  (Templates Jinja2 + JavaScript + CSS)      │
-└──────────────────┬──────────────────────────┘
-                   │
 ┌──────────────────▼──────────────────────────┐
 │           Controller Layer                   │
 │        (Flask Routes + WebSocket)           │
@@ -47,7 +40,6 @@ La aplicación sigue una arquitectura en capas basada en principios SOLID:
 
 - Python 3.8 o superior
 - Cuenta en Alpaca Markets (Paper Trading)
-- Navegador web moderno
 
 ## 🚀 Instalación
 
@@ -104,7 +96,7 @@ DEBUG=True
 python app.py
 ```
 
-La aplicación estará disponible en: `http://localhost:5000`
+La API estará disponible en: `http://localhost:5080`
 
 ## 📁 Estructura del Proyecto
 
@@ -125,60 +117,10 @@ proyecto_trading/
 ├── models/                        # Modelos de datos
 │   ├── __init__.py
 │   └── order.py                  # Modelos: Order, Position, Account
-│
-├── templates/                     # Templates Jinja2
-│   ├── base.html                 # Template base
-│   ├── dashboard.html            # Dashboard principal
-│   └── error.html                # Página de error
-│
-└── static/                        # Archivos estáticos
-    ├── css/
-    │   └── styles.css            # Estilos personalizados
-    └── js/
-        ├── websocket.js          # Cliente WebSocket
-        ├── trading.js            # Lógica de trading UI
-        └── chart.js              # Gráficos con Chart.js
+
+└── sockets/                       # WebSocket handlers (server)
+    └── ws_events.py
 ```
-
-## 🎮 Uso de la Aplicación
-
-### Dashboard Principal
-
-El dashboard muestra:
-
-- **Información de Cuenta**: Cash, buying power, portfolio value
-- **Gráfico de Precios**: Visualización histórica e interactiva
-- **Posiciones Abiertas**: P&L en tiempo real
-- **Órdenes Abiertas**: Estado y gestión de órdenes
-
-### Crear una Orden Simple
-
-1. En el panel "Nueva Orden":
-   - Ingresa el símbolo (ej: AAPL)
-   - Define la cantidad de acciones
-   - Selecciona tipo (Comprar/Vender)
-   - Elige orden de mercado o límite
-   - Si es límite, especifica el precio
-2. Click en "Enviar Orden"
-
-### Crear un Swing Trade
-
-1. En el panel "Swing Trade":
-   - Ingresa el símbolo
-   - Define la cantidad
-   - Establece precio de entrada
-   - Define take profit (objetivo)
-   - Define stop loss (límite de pérdida)
-2. Click en "Crear Swing Trade"
-
-La aplicación creará automáticamente la orden de entrada con los límites especificados.
-
-### Visualizar Gráficos
-
-1. En el panel de gráfico, ingresa un símbolo
-2. Click en "Cargar"
-3. El gráfico mostrará los últimos 100 períodos
-4. Las actualizaciones de precio se reflejan en tiempo real
 
 ## 🔧 API REST Endpoints
 

@@ -6,14 +6,12 @@ para operaciones de trading en tiempo real.
 """
 
 import logging
-from typing import Dict, Any
 
-from flask import Flask, render_template, request, jsonify, g
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from config import config
-from utils.auth_utils import require_auth
 from routes.auth_routes import register_auth_routes
 from routes.user_routes import register_user_routes
 from routes.screener_routes import register_screener_routes
@@ -49,32 +47,31 @@ register_screener_routes(app)
 register_trading_routes(app, socketio)
 register_socket_handlers(socketio)
 
-# ============================================================================
-# RUTAS WEB (Renderizado de templates)
-# ============================================================================
 
 @app.route('/')
 def index():
-    """
-    Ruta principal que renderiza el dashboard.
-    
-    Returns:
-        str: HTML del dashboard
-    """
     try:
-        # Validar configuración
         is_valid, errors = config.validate()
         if not is_valid:
             logger.error(f"Configuración inválida: {errors}")
-            return render_template(
-                'error.html',
-                errors=errors
-            ), 500
-        
-        return render_template('dashboard.html')
+            return jsonify({
+                'success': False,
+                'error': 'Configuración inválida',
+                'details': errors,
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'status': 'ok',
+            },
+        })
     except Exception as e:
-        logger.error(f"Error al cargar dashboard: {str(e)}")
-        return render_template('error.html', errors=[str(e)]), 500
+        logger.error(f"Error al procesar healthcheck: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Error interno del servidor',
+        }), 500
 
 
 
