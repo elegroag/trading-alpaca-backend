@@ -11,10 +11,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-if os.getenv('SOCKETIO_ASYNC_MODE', 'threading').lower() == 'eventlet':
+_socketio_async_mode = os.getenv('SOCKETIO_ASYNC_MODE', 'threading').lower()
+if _socketio_async_mode == 'eventlet':
     import eventlet
 
     eventlet.monkey_patch()
+elif _socketio_async_mode.startswith('gevent'):
+    from gevent import monkey
+
+    monkey.patch_all()
 
 import logging
 
@@ -27,6 +32,7 @@ from routes.auth_routes import register_auth_routes
 from routes.user_routes import register_user_routes
 from routes.screener_routes import register_screener_routes
 from routes.trading_routes import register_trading_routes
+from routes.news_routes import register_news_routes
 from sockets.ws_events import register_socket_handlers
 
 
@@ -56,6 +62,7 @@ register_auth_routes(app)
 register_user_routes(app)
 register_screener_routes(app)
 register_trading_routes(app, socketio)
+register_news_routes(app)
 register_socket_handlers(socketio)
 
 
@@ -128,6 +135,6 @@ if __name__ == '__main__':
     socketio.run(
         app,
         debug=config.DEBUG,
-        host='0.0.0.0',
-        port=5080
+        host=config.API_HOST,
+        port=config.API_PORT
     )

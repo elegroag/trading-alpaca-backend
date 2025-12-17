@@ -16,6 +16,11 @@ from services.market_screener_service import (
     MarketScreenerService,
     MarketScreenerServiceException,
 )
+from services.news_scraper_service import (
+    news_scraper_service,
+    NewsScraperService,
+    NewsScraperServiceException,
+)
 from services.symbol_preferences_service import (
     symbol_preferences_service,
     SymbolPreferencesService,
@@ -35,6 +40,9 @@ __all__ = [
     "market_screener_service",
     "MarketScreenerService",
     "MarketScreenerServiceException",
+    "news_scraper_service",
+    "NewsScraperService",
+    "NewsScraperServiceException",
     "symbol_preferences_service",
     "SymbolPreferencesService",
     "SymbolPreferencesServiceException",

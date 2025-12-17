@@ -46,7 +46,15 @@ class Config:
         
         # Configuración de Flask
         self.SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-        self.DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+        self.API_MODE = os.getenv('API_MODE', 'development').lower()
+        self.API_HOST = os.getenv('API_HOST', '0.0.0.0')
+        self.API_PORT = int(os.getenv('API_PORT', '5080'))
+
+        _debug_env = os.getenv('DEBUG')
+        if _debug_env is None:
+            self.DEBUG = self.API_MODE == 'development'
+        else:
+            self.DEBUG = _debug_env.lower() == 'true'
         
         # Configuración de SocketIO
         self.SOCKETIO_ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'threading')
@@ -117,6 +125,9 @@ class Config:
         """
         return {
             'ALPACA_BASE_URL': self.ALPACA_BASE_URL,
+            'API_MODE': self.API_MODE,
+            'API_HOST': self.API_HOST,
+            'API_PORT': self.API_PORT,
             'DEBUG': self.DEBUG,
             'SOCKETIO_ASYNC_MODE': self.SOCKETIO_ASYNC_MODE,
             'MIN_ORDER_SIZE': self.MIN_ORDER_SIZE,
