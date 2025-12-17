@@ -49,7 +49,7 @@ class Config:
         self.DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
         
         # Configuración de SocketIO
-        self.SOCKETIO_ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'eventlet')
+        self.SOCKETIO_ASYNC_MODE = os.getenv('SOCKETIO_ASYNC_MODE', 'threading')
         self.SOCKETIO_PING_TIMEOUT = int(os.getenv('SOCKETIO_PING_TIMEOUT', '60'))
         self.SOCKETIO_PING_INTERVAL = int(os.getenv('SOCKETIO_PING_INTERVAL', '25'))
         

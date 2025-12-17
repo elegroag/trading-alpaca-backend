@@ -98,6 +98,14 @@ def register_socket_handlers(socketio: SocketIO) -> None:
                 )
                 return
 
+            order_id = getattr(order, "id", None)
+            if order_id is not None:
+                order_id = str(order_id)
+
+            status = getattr(order, "status", None)
+            if status is not None:
+                status = str(status)
+
             auto_swing_state[key] = today
 
             payload = {
@@ -106,8 +114,8 @@ def register_socket_handlers(socketio: SocketIO) -> None:
                 "entry_price": signal.entry_price,
                 "stop_price": signal.stop_price,
                 "take_profit_price": signal.take_profit_price,
-                "order_id": getattr(order, "id", None),
-                "status": getattr(order, "status", None),
+                "order_id": order_id,
+                "status": status,
             }
             socketio.emit("swing_auto_trade", payload, room=sid)
 

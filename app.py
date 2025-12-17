@@ -5,6 +5,17 @@ Implementa el patrón MVC y proporciona endpoints REST y WebSocket
 para operaciones de trading en tiempo real.
 """
 
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if os.getenv('SOCKETIO_ASYNC_MODE', 'threading').lower() == 'eventlet':
+    import eventlet
+
+    eventlet.monkey_patch()
+
 import logging
 
 from flask import Flask, jsonify
@@ -72,13 +83,6 @@ def index():
             'success': False,
             'error': 'Error interno del servidor',
         }), 500
-
-
-
-
-
-
-
 
 # ============================================================================
 # ERROR HANDLERS

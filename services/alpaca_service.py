@@ -414,7 +414,7 @@ class AlpacaService:
 
                 attrs = getattr(asset, "attributes", None)
                 if attrs is not None:
-                    asset_attributes = list(attrs)
+                    asset_attributes = [str(a) for a in list(attrs)]
             except Exception:
                 # Si falla la obtención del asset, devolvemos solo la información básica de precio
                 asset_name = asset_name

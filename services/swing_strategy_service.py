@@ -254,14 +254,22 @@ class SwingStrategyService:
 
             try:
                 order = self.execute_signal(signal, user=user)
+                order_id = getattr(order, "id", None)
+                if order_id is not None:
+                    order_id = str(order_id)
+
+                status = getattr(order, "status", None)
+                if status is not None:
+                    status = str(status)
+
                 summary.update(
                     {
                         "qty": signal.qty,
                         "entry_price": signal.entry_price,
                         "stop_price": signal.stop_price,
                         "take_profit_price": signal.take_profit_price,
-                        "order_id": order.id,
-                        "status": getattr(order, "status", None),
+                        "order_id": order_id,
+                        "status": status,
                     }
                 )
             except SwingStrategyServiceException as e:
