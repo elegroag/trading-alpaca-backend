@@ -311,6 +311,7 @@ class AlpacaService:
                 order_data = MarketOrderRequest(
                     symbol=order.symbol,
                     qty=order.qty,
+                    notional=order.notional,
                     side=alpaca_side,
                     time_in_force=alpaca_tif,
                 )
@@ -322,6 +323,7 @@ class AlpacaService:
                 order_data = LimitOrderRequest(
                     symbol=order.symbol,
                     qty=order.qty,
+                    notional=order.notional,
                     side=alpaca_side,
                     time_in_force=alpaca_tif,
                     limit_price=order.limit_price,

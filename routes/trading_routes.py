@@ -59,13 +59,20 @@ def register_trading_routes(app: Flask, socketio: SocketIO) -> None:
         try:
             data = request.get_json() or {}
 
-            required_fields = ['symbol', 'qty', 'side', 'order_type']
-            for field in required_fields:
-                if field not in data:
-                    return jsonify({
-                        'success': False,
-                        'error': f'Campo requerido faltante: {field}',
-                    }), 400
+            if 'symbol' not in data or 'side' not in data or 'order_type' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Campos requeridos faltantes: symbol, side, order_type',
+                }), 400
+
+            if 'qty' not in data and 'notional' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'Se debe especificar qty o notional',
+                }), 400
+
+            qty = float(data['qty']) if 'qty' in data and data['qty'] else None
+            notional = float(data['notional']) if 'notional' in data and data['notional'] else None
 
             side = (
                 OrderSide.BUY
@@ -76,7 +83,8 @@ def register_trading_routes(app: Flask, socketio: SocketIO) -> None:
             if str(data['order_type']).lower() == 'market':
                 order = trading_service.create_market_order(
                     symbol=str(data['symbol']).upper(),
-                    qty=float(data['qty']),
+                    qty=qty,
+                    notional=notional,
                     side=side,
                     user=g.current_user,
                 )
@@ -89,7 +97,8 @@ def register_trading_routes(app: Flask, socketio: SocketIO) -> None:
 
                 order = trading_service.create_limit_order(
                     symbol=str(data['symbol']).upper(),
-                    qty=float(data['qty']),
+                    qty=qty,
+                    notional=notional,
                     side=side,
                     limit_price=float(data['limit_price']),
                     user=g.current_user,

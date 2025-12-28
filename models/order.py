@@ -68,9 +68,10 @@ class Order:
         updated_at: Fecha de actualización
     """
     symbol: str
-    qty: float
     side: OrderSide
     order_type: OrderType
+    qty: Optional[float] = None
+    notional: Optional[float] = None
     time_in_force: str = 'gtc'
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
@@ -87,6 +88,7 @@ class Order:
             'order_id': str(self.order_id) if self.order_id else None,
             'symbol': self.symbol,
             'qty': self.qty,
+            'notional': self.notional,
             'side': self.side.value if hasattr(self.side, 'value') else str(self.side),
             'order_type': self.order_type.value if hasattr(self.order_type, 'value') else str(self.order_type),
             'time_in_force': self.time_in_force,
@@ -143,7 +145,8 @@ class Order:
         return cls(
             order_id=str(alpaca_order.id),
             symbol=alpaca_order.symbol,
-            qty=float(alpaca_order.qty),
+            qty=float(alpaca_order.qty) if alpaca_order.qty else None,
+            notional=float(alpaca_order.notional) if hasattr(alpaca_order, 'notional') and alpaca_order.notional else None,
             side=side,
             order_type=order_type,
             time_in_force=alpaca_order.time_in_force,

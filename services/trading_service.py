@@ -53,19 +53,20 @@ class TradingService:
     # VALIDACIONES
     # ========================================================================
     
-    def _validate_order_size(self, symbol: str, qty: float, price: float) -> None:
+    def _validate_order_size(self, symbol: str, qty: Optional[float], price: float, notional: Optional[float] = None) -> None:
         """
         Valida que el tamaño de la orden esté dentro de los límites.
         
         Args:
             symbol: Símbolo del activo
-            qty: Cantidad de acciones
+            qty: Cantidad de acciones (opcional si hay notional)
             price: Precio por acción
+            notional: Monto en dólares (opcional si hay qty)
             
         Raises:
             TradingServiceException: Si la orden no cumple con los límites
         """
-        order_value = qty * price
+        order_value = notional if notional is not None else (qty * price if qty is not None else 0)
         
         if order_value < config.MIN_ORDER_SIZE:
             raise TradingServiceException(
@@ -104,8 +105,9 @@ class TradingService:
     def create_market_order(
         self,
         symbol: str,
-        qty: float,
-        side: OrderSide,
+        qty: Optional[float] = None,
+        notional: Optional[float] = None,
+        side: OrderSide = OrderSide.BUY,
         user: Optional[User] = None,
     ) -> Order:
         """
@@ -114,6 +116,7 @@ class TradingService:
         Args:
             symbol: Símbolo del activo
             qty: Cantidad de acciones
+            notional: Monto en dólares
             side: Lado de la orden (compra/venta)
             
         Returns:
@@ -123,24 +126,30 @@ class TradingService:
             TradingServiceException: Si hay un error al crear la orden
         """
         try:
+            if qty is None and notional is None:
+                raise TradingServiceException("Se debe especificar 'qty' o 'notional'")
+
             # Obtener precio actual para validaciones
             quote = self._alpaca_service.get_last_quote(symbol, user=user)
             current_price = quote['price']
             
             # Validar tamaño de orden
-            self._validate_order_size(symbol, qty, current_price)
+            self._validate_order_size(symbol, qty, current_price, notional)
             
+            order_value = notional if notional is not None else (qty * current_price)
+
             # Validar poder de compra solo para órdenes de compra
             if side == OrderSide.BUY:
-                self._validate_buying_power(qty * current_price, user=user)
+                self._validate_buying_power(order_value, user=user)
             
             # Crear orden
             order = Order(
                 symbol=symbol,
                 qty=qty,
+                notional=notional,
                 side=side,
                 order_type=OrderType.MARKET,
-                time_in_force='gtc'
+                time_in_force='day' if notional is not None or (qty is not None and qty < 1) else 'gtc'
             )
             
             # Enviar orden
@@ -159,9 +168,10 @@ class TradingService:
     def create_limit_order(
         self,
         symbol: str,
-        qty: float,
-        side: OrderSide,
-        limit_price: float,
+        qty: Optional[float] = None,
+        notional: Optional[float] = None,
+        side: OrderSide = OrderSide.BUY,
+        limit_price: float = 0.0,
         user: Optional[User] = None,
     ) -> Order:
         """
@@ -170,6 +180,7 @@ class TradingService:
         Args:
             symbol: Símbolo del activo
             qty: Cantidad de acciones
+            notional: Monto en dólares
             side: Lado de la orden (compra/venta)
             limit_price: Precio límite
             
@@ -180,21 +191,27 @@ class TradingService:
             TradingServiceException: Si hay un error al crear la orden
         """
         try:
+            if qty is None and notional is None:
+                raise TradingServiceException("Se debe especificar 'qty' o 'notional'")
+
             # Validar tamaño de orden
-            self._validate_order_size(symbol, qty, limit_price)
+            self._validate_order_size(symbol, qty, limit_price, notional)
             
+            order_value = notional if notional is not None else (qty * limit_price)
+
             # Validar poder de compra solo para órdenes de compra
             if side == OrderSide.BUY:
-                self._validate_buying_power(qty * limit_price, user=user)
+                self._validate_buying_power(order_value, user=user)
             
             # Crear orden
             order = Order(
                 symbol=symbol,
                 qty=qty,
+                notional=notional,
                 side=side,
                 order_type=OrderType.LIMIT,
                 limit_price=limit_price,
-                time_in_force='gtc'
+                time_in_force='day' if notional is not None or (qty is not None and qty < 1) else 'gtc'
             )
             
             # Enviar orden
