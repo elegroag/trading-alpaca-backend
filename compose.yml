@@ -16,6 +16,8 @@ services:
       - "5080:5080"
     volumes:
       - .:/app
+      - uv-cache:/root/.cache/uv
+      - uv-cache:/app/.venv
     networks:
       - wslnet
     healthcheck:
@@ -30,3 +32,6 @@ networks:
   wslnet:
     driver: bridge
     external: true
+
+volumes:
+  uv-cache:

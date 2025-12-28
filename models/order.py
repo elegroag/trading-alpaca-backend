@@ -23,6 +23,8 @@ class OrderType(Enum):
     LIMIT = 'limit'
     STOP = 'stop'
     STOP_LIMIT = 'stop_limit'
+    TRAILING_STOP = 'trailing_stop'
+    BRACKET = 'bracket'
 
 
 class OrderStatus(Enum):
@@ -82,15 +84,15 @@ class Order:
     def to_dict(self) -> Dict[str, Any]:
         """Convierte la orden a diccionario."""
         return {
-            'order_id': self.order_id,
+            'order_id': str(self.order_id) if self.order_id else None,
             'symbol': self.symbol,
             'qty': self.qty,
-            'side': self.side.value,
-            'order_type': self.order_type.value,
+            'side': self.side.value if hasattr(self.side, 'value') else str(self.side),
+            'order_type': self.order_type.value if hasattr(self.order_type, 'value') else str(self.order_type),
             'time_in_force': self.time_in_force,
             'limit_price': self.limit_price,
             'stop_price': self.stop_price,
-            'status': self.status.value,
+            'status': self.status.value if hasattr(self.status, 'value') else str(self.status),
             'filled_qty': self.filled_qty,
             'filled_avg_price': self.filled_avg_price,
             'created_at': self.created_at.isoformat() if self.created_at else None,

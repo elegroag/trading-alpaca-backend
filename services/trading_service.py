@@ -12,6 +12,22 @@ from services.alpaca_service import alpaca_service, AlpacaServiceException
 from models.user import User
 from config import config
 
+# Imports de Alpaca para nuevos tipos de órdenes
+from alpaca.trading.requests import (
+    MarketOrderRequest,
+    LimitOrderRequest,
+    StopOrderRequest,
+    StopLimitOrderRequest,
+    TrailingStopOrderRequest,
+    TakeProfitRequest,
+    StopLossRequest,
+)
+from alpaca.trading.enums import (
+    OrderSide as AlpacaOrderSide,
+    TimeInForce,
+    OrderClass,
+)
+
 # Configurar logger
 logger = logging.getLogger(__name__)
 
@@ -255,6 +271,244 @@ class TradingService:
             raise
         except Exception as e:
             logger.error(f"Error inesperado al crear swing trade: {str(e)}")
+            raise TradingServiceException(f"Error inesperado: {str(e)}")
+    
+    def create_stop_order(
+        self,
+        symbol: str,
+        qty: float,
+        side: OrderSide,
+        stop_price: float,
+        user: Optional[User] = None,
+    ) -> Order:
+        """
+        Crea una orden stop.
+        
+        Args:
+            symbol: Símbolo del activo
+            qty: Cantidad de acciones
+            side: Lado de la orden (buy/sell)
+            stop_price: Precio de activación
+            
+        Returns:
+            Order: Orden creada
+            
+        Raises:
+            TradingServiceException: Si hay un error al crear la orden
+        """
+        try:
+            if qty <= 0:
+                raise TradingServiceException("La cantidad debe ser mayor a cero")
+            
+            if stop_price <= 0:
+                raise TradingServiceException("El precio de stop debe ser mayor a cero")
+            
+            # Crear orden stop con Alpaca
+            order_request = StopOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                time_in_force=TimeInForce.DAY,
+                stop_price=stop_price,
+            )
+            
+            order = self._alpaca_service.submit_order_request(order_request, user=user)
+            
+            logger.info(f"Orden stop creada: {symbol} {side} {qty} @ stop {stop_price}")
+            return order
+            
+        except AlpacaServiceException as e:
+            logger.error(f"Error al crear orden stop: {str(e)}")
+            raise TradingServiceException(f"Error al crear orden stop: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error inesperado al crear orden stop: {str(e)}")
+            raise TradingServiceException(f"Error inesperado: {str(e)}")
+    
+    def create_stop_limit_order(
+        self,
+        symbol: str,
+        qty: float,
+        side: OrderSide,
+        stop_price: float,
+        limit_price: float,
+        user: Optional[User] = None,
+    ) -> Order:
+        """
+        Crea una orden stop limit.
+        
+        Args:
+            symbol: Símbolo del activo
+            qty: Cantidad de acciones
+            side: Lado de la orden (buy/sell)
+            stop_price: Precio de activación
+            limit_price: Precio límite
+            
+        Returns:
+            Order: Orden creada
+            
+        Raises:
+            TradingServiceException: Si hay un error al crear la orden
+        """
+        try:
+            if qty <= 0:
+                raise TradingServiceException("La cantidad debe ser mayor a cero")
+            
+            if stop_price <= 0:
+                raise TradingServiceException("El precio de stop debe ser mayor a cero")
+            
+            if limit_price <= 0:
+                raise TradingServiceException("El precio límite debe ser mayor a cero")
+            
+            # Crear orden stop limit con Alpaca
+            order_request = StopLimitOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                time_in_force=TimeInForce.DAY,
+                stop_price=stop_price,
+                limit_price=limit_price,
+            )
+            
+            order = self._alpaca_service.submit_order_request(order_request, user=user)
+            
+            logger.info(f"Orden stop limit creada: {symbol} {side} {qty} @ stop {stop_price} limit {limit_price}")
+            return order
+            
+        except AlpacaServiceException as e:
+            logger.error(f"Error al crear orden stop limit: {str(e)}")
+            raise TradingServiceException(f"Error al crear orden stop limit: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error inesperado al crear orden stop limit: {str(e)}")
+            raise TradingServiceException(f"Error inesperado: {str(e)}")
+    
+    def create_trailing_stop_order(
+        self,
+        symbol: str,
+        qty: float,
+        side: OrderSide,
+        trail_price: Optional[float] = None,
+        trail_percent: Optional[float] = None,
+        user: Optional[User] = None,
+    ) -> Order:
+        """
+        Crea una orden trailing stop.
+        
+        Args:
+            symbol: Símbolo del activo
+            qty: Cantidad de acciones
+            side: Lado de la orden (buy/sell)
+            trail_price: Monto del trail en dólares
+            trail_percent: Porcentaje del trail
+            
+        Returns:
+            Order: Orden creada
+            
+        Raises:
+            TradingServiceException: Si hay un error al crear la orden
+        """
+        try:
+            if qty <= 0:
+                raise TradingServiceException("La cantidad debe ser mayor a cero")
+            
+            if not trail_price and not trail_percent:
+                raise TradingServiceException("Debe especificar trail_price o trail_percent")
+            
+            # Crear orden trailing stop con Alpaca
+            order_request = TrailingStopOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                time_in_force=TimeInForce.DAY,
+                trail_price=trail_price,
+                trail_percent=trail_percent,
+            )
+            
+            order = self._alpaca_service.submit_order_request(order_request, user=user)
+            
+            trail_info = f"${trail_price}" if trail_price else f"{trail_percent}%"
+            logger.info(f"Orden trailing stop creada: {symbol} {side} {qty} trail {trail_info}")
+            return order
+            
+        except AlpacaServiceException as e:
+            logger.error(f"Error al crear orden trailing stop: {str(e)}")
+            raise TradingServiceException(f"Error al crear orden trailing stop: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error inesperado al crear orden trailing stop: {str(e)}")
+            raise TradingServiceException(f"Error inesperado: {str(e)}")
+    
+    def create_bracket_order(
+        self,
+        symbol: str,
+        qty: float,
+        side: OrderSide,
+        limit_price: float,
+        take_profit: Dict[str, float],
+        stop_loss: Dict[str, float],
+        user: Optional[User] = None,
+    ) -> Order:
+        """
+        Crea una orden bracket (con take profit y stop loss).
+        
+        Args:
+            symbol: Símbolo del activo
+            qty: Cantidad de acciones
+            side: Lado de la orden (buy/sell)
+            limit_price: Precio límite de entrada
+            take_profit: Diccionario con limit_price de take profit
+            stop_loss: Diccionario con stop_price y opcional limit_price
+            
+        Returns:
+            Order: Orden principal creada
+            
+        Raises:
+            TradingServiceException: Si hay un error al crear la orden
+        """
+        try:
+            if qty <= 0:
+                raise TradingServiceException("La cantidad debe ser mayor a cero")
+            
+            if limit_price <= 0:
+                raise TradingServiceException("El precio límite debe ser mayor a cero")
+            
+            tp_limit_price = take_profit.get('limit_price', 0)
+            sl_stop_price = stop_loss.get('stop_price', 0)
+            sl_limit_price = stop_loss.get('limit_price')
+            
+            if tp_limit_price <= 0:
+                raise TradingServiceException("El precio de take profit debe ser mayor a cero")
+            
+            if sl_stop_price <= 0:
+                raise TradingServiceException("El precio de stop loss debe ser mayor a cero")
+            
+            # Crear objetos de take profit y stop loss
+            tp_request = TakeProfitRequest(limit_price=tp_limit_price)
+            
+            sl_request = StopLossRequest(stop_price=sl_stop_price)
+            if sl_limit_price:
+                sl_request.limit_price = sl_limit_price
+            
+            # Crear orden bracket con Alpaca
+            order_request = LimitOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=side,
+                time_in_force=TimeInForce.DAY,
+                limit_price=limit_price,
+                order_class=OrderClass.BRACKET,
+                take_profit=tp_request,
+                stop_loss=sl_request,
+            )
+            
+            order = self._alpaca_service.submit_order_request(order_request, user=user)
+            
+            logger.info(f"Orden bracket creada: {symbol} {side} {qty} @ {limit_price}, TP: {tp_limit_price}, SL: {sl_stop_price}")
+            return order
+            
+        except AlpacaServiceException as e:
+            logger.error(f"Error al crear orden bracket: {str(e)}")
+            raise TradingServiceException(f"Error al crear orden bracket: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error inesperado al crear orden bracket: {str(e)}")
             raise TradingServiceException(f"Error inesperado: {str(e)}")
     
     # ========================================================================

@@ -88,7 +88,7 @@ def register_favorites_routes(app: Flask) -> None:
             return jsonify({'success': False, 'error': 'Error interno del servidor'}), 500
 
 
-    @app.route('/api/user/favorites/refresh', methods=['POST'])
+    @app.route('/api/favorites/refresh', methods=['POST'])
     @require_auth
     def refresh_favorites():
         """Fuerza la actualización de todos los símbolos favoritos desde Alpaca."""

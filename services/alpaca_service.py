@@ -223,6 +223,60 @@ class AlpacaService:
     # MÉTODOS DE ÓRDENES
     # ========================================================================
 
+    def submit_order_request(self, order_request, user: Optional[User] = None) -> Order:
+        """
+        Envía directamente un OrderRequest de Alpaca al broker.
+
+        Args:
+            order_request: OrderRequest de Alpaca (MarketOrderRequest, LimitOrderRequest, etc.)
+            user: Usuario autenticado
+
+        Returns:
+            Order: Orden creada con ID asignado
+
+        Raises:
+            AlpacaServiceException: Si hay un error al enviar la orden
+        """
+        try:
+            # Obtener cliente de trading para el usuario
+            trading_client = self._get_trading_client_for_user(user)
+            
+            # Enviar orden directamente
+            submitted_order = trading_client.submit_order(order_request)
+            
+            # Convertir a nuestro modelo Order
+            order = Order(
+                order_id=submitted_order.id,
+                symbol=submitted_order.symbol,
+                qty=submitted_order.qty,
+                side=OrderSide.BUY if submitted_order.side.value == 'buy' else OrderSide.SELL,
+                order_type=self._map_alpaca_order_type(submitted_order),
+                time_in_force=submitted_order.time_in_force.value,
+                limit_price=getattr(submitted_order, 'limit_price', None),
+                stop_price=getattr(submitted_order, 'stop_price', None),
+                status=submitted_order.status.value,
+                created_at=submitted_order.created_at,
+                filled_qty=getattr(submitted_order, 'filled_qty', None),
+                filled_avg_price=getattr(submitted_order, 'filled_avg_price', None),
+            )
+            
+            logger.info(f"Orden enviada exitosamente: {order.order_id}")
+            return order
+            
+        except Exception as e:
+            logger.error(f"Error inesperado al enviar orden: {str(e)}")
+            raise AlpacaServiceException(f"Error inesperado: {str(e)}")
+
+    def _map_alpaca_order_type(self, order) -> OrderType:
+        """Mapea el tipo de orden de Alpaca a nuestro enum."""
+        if hasattr(order, 'order_class') and order.order_class:
+            if order.order_class.value == 'bracket':
+                return OrderType.BRACKET
+        
+        # Mapeo por tipo de request
+        order_type = type(order).__name__.replace('OrderRequest', '').upper()
+        return getattr(OrderType, order_type, OrderType.MARKET)
+
     def submit_order(self, order: Order, user: Optional[User] = None) -> Order:
         """
         Envía una orden al broker.

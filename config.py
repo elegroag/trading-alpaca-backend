@@ -81,7 +81,7 @@ class Config:
 
         # Configuración de seguridad
         self.FERNET_KEY = os.getenv('FERNET_KEY', '')
-        self.JWT_EXPIRES_MIN = int(os.getenv('JWT_EXPIRES_MIN', '60'))
+        self.JWT_EXPIRES_MIN = int(os.getenv('JWT_EXPIRES_MIN', '720'))
         self.JWT_ALGORITHM = 'HS256'
 
         self._initialized = True

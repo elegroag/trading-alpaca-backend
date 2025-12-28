@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import bcrypt
@@ -48,7 +48,7 @@ def generate_jwt(user_id: str, email: str, role: str) -> str:
         "sub": user_id,
         "email": email,
         "role": role,
-        "exp": datetime.utcnow() + timedelta(minutes=config.JWT_EXPIRES_MIN),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=config.JWT_EXPIRES_MIN),
     }
     token = jwt.encode(payload, config.SECRET_KEY, algorithm=config.JWT_ALGORITHM)
     if isinstance(token, bytes):
