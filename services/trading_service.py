@@ -129,6 +129,12 @@ class TradingService:
             if qty is None and notional is None:
                 raise TradingServiceException("Se debe especificar 'qty' o 'notional'")
 
+            # Validar si el activo es fractionable para órdenes fraccionales
+            is_fractional = notional is not None or (qty is not None and qty % 1 != 0)
+            if is_fractional:
+                if not self._alpaca_service.is_fractionable(symbol, user=user):
+                    raise TradingServiceException(f"El activo {symbol} no soporta órdenes fraccionales.")
+
             # Obtener precio actual para validaciones
             quote = self._alpaca_service.get_last_quote(symbol, user=user)
             current_price = quote['price']
@@ -193,6 +199,12 @@ class TradingService:
         try:
             if qty is None and notional is None:
                 raise TradingServiceException("Se debe especificar 'qty' o 'notional'")
+
+            # Validar si el activo es fractionable para órdenes fraccionales
+            is_fractional = notional is not None or (qty is not None and qty % 1 != 0)
+            if is_fractional:
+                if not self._alpaca_service.is_fractionable(symbol, user=user):
+                    raise TradingServiceException(f"El activo {symbol} no soporta órdenes fraccionales.")
 
             # Validar tamaño de orden
             self._validate_order_size(symbol, qty, limit_price, notional)

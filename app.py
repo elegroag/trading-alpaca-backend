@@ -34,6 +34,7 @@ from routes.preferences_router import register_preferences_routes
 from routes.favorites_router import register_favorites_routes
 from routes.screener_routes import register_screener_routes
 from routes.trading_routes import register_trading_routes
+from routes.order_routes import order_bp, init_order_socket
 from routes.news_routes import register_news_routes
 from sockets.ws_events import register_socket_handlers
 
@@ -66,6 +67,8 @@ register_preferences_routes(app)
 register_favorites_routes(app)
 register_screener_routes(app)
 register_trading_routes(app, socketio)
+app.register_blueprint(order_bp, url_prefix='/api')
+init_order_socket(socketio)
 register_news_routes(app)
 register_socket_handlers(socketio)
 

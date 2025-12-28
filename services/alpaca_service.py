@@ -429,6 +429,25 @@ class AlpacaService:
             logger.error(f"Error inesperado al cancelar orden {order_id}: {str(e)}")
             raise AlpacaServiceException(f"Error inesperado: {str(e)}")
 
+    def is_fractionable(self, symbol: str, user: Optional[User] = None) -> bool:
+        """
+        Verifica si un activo permite órdenes fraccionadas.
+
+        Args:
+            symbol: Símbolo del activo
+            user: Usuario autenticado
+
+        Returns:
+            bool: True si el activo es fractionable, False en caso contrario
+        """
+        try:
+            client = self._get_trading_client_for_user(user)
+            asset = client.get_asset(symbol_or_asset_id=symbol)
+            return getattr(asset, 'fractionable', False)
+        except Exception as e:
+            logger.error(f"Error al verificar si el activo {symbol} es fractionable: {str(e)}")
+            return False
+
     # ========================================================================
     # MÉTODOS DE DATOS DE MERCADO
     # ========================================================================
