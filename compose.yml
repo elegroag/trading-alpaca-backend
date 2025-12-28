@@ -1,0 +1,31 @@
+services:
+  flask_trading:
+    container_name: flask-trading-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - APP_ENV=development
+      - HOST=0.0.0.0
+      - PORT=5080
+    ports:
+      - "5080:5080"
+    volumes:
+      - .:/app
+    networks:
+      - wslnet
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://0.0.0.0:5080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  wslnet:
+    driver: bridge
+    external: true
