@@ -30,6 +30,8 @@ from flask_socketio import SocketIO
 from config import config
 from routes.auth_routes import register_auth_routes
 from routes.user_routes import register_user_routes
+from routes.preferences_router import register_preferences_routes
+from routes.favorites_router import register_favorites_routes
 from routes.screener_routes import register_screener_routes
 from routes.trading_routes import register_trading_routes
 from routes.news_routes import register_news_routes
@@ -60,6 +62,8 @@ socketio = SocketIO(
 # Registrar rutas
 register_auth_routes(app)
 register_user_routes(app)
+register_preferences_routes(app)
+register_favorites_routes(app)
 register_screener_routes(app)
 register_trading_routes(app, socketio)
 register_news_routes(app)

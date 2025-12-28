@@ -24,6 +24,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    command: uv run gunicorn --worker-class eventlet -w 1 --timeout 120 --bind 0.0.0.0:5080 app:app
 
 networks:
   wslnet:

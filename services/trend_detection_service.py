@@ -130,10 +130,11 @@ class TrendDetectionService:
         # Random Forest: usa y directamente (0,1,2)
         if model_type_key in {"rf", "random_forest", "random-forest"}:
             model = RandomForestClassifier(
-                n_estimators=300,
-                max_depth=8,
-                n_jobs=-1,
+                n_estimators=100,  # Reducido de 300 a 100
+                max_depth=5,       # Reducido de 8 a 5
+                n_jobs=1,          # Cambiado de -1 a 1 para evitar multiprocessing
                 class_weight="balanced_subsample",
+                random_state=42,   # Para reproducibilidad
             )
             model_type_key = "random_forest"
 
