@@ -6,7 +6,7 @@ más activas por volumen o número de trades.
 
 from typing import List, Dict, Any, Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from alpaca.data.historical.screener import ScreenerClient
 from alpaca.data.requests import MostActivesRequest, MarketMoversRequest, StockQuotesRequest, StockTradesRequest
@@ -57,18 +57,9 @@ class MarketScreenerService:
         market: str = "stocks",
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        exchange: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Obtiene las acciones más activas.
-
-        Args:
-            user: Usuario autenticado (para usar sus claves Alpaca si existen).
-            by: Métrica para ordenar ("volume" o "trades").
-            top: Número de símbolos a devolver.
-            market: Mercado ("stocks" o "crypto").
-
-        Returns:
-            Lista de diccionarios con información de cada acción.
-        """
+        """Obtiene las acciones más activas."""
         try:
             client = self._get_client_for_user(user)
 
@@ -96,28 +87,27 @@ class MarketScreenerService:
             items: List[Dict[str, Any]] = []
             last_updated = getattr(result, "last_updated", None)
             for item in getattr(result, "most_actives", []):
-                # Intentar obtener un precio de cierre razonable si el tipo lo expone
-                close_value = getattr(item, "prev_close", None)
-                if close_value is None:
-                    close_value = getattr(item, "previous_close", None)
-                if close_value is None:
-                    close_value = getattr(item, "close", None)
-
+                # Filtro por Exchange si se especifica (se aplicará después de enriquecer)
                 items.append(
                     {
                         "symbol": getattr(item, "symbol", None),
-                        "name": getattr(item, "name", None),
+                        "name": None,  # Se enriquecerá después
                         "volume": getattr(item, "volume", None),
                         "trade_count": getattr(item, "trade_count", None),
-                        "price": getattr(item, "price", None),
-                        "close": close_value,
+                        "price": None,  # Se enriquecerá después
+                        "close": None,  # Se enriquecerá después
                         "market": market_enum.value if hasattr(market_enum, "value") else str(market_enum),
                         "by": by_enum.value if hasattr(by_enum, "value") else str(by_enum),
+                        "exchange": None,  # Se enriquecerá después
                         "last_updated": last_updated.isoformat() if last_updated else None,
                     }
                 )
 
-            # Fallback: enriquecer precios usando cache de Mongo y, si hace falta, Alpaca
+            # Fallback: enriquecer precios usando cache de Mongo y, si hace falta, Alpaca en lote
+            # Recolectar símbolos que necesitan enriquecimiento
+            symbols_to_enrich = []
+            enrichment_map = {}  # symbol -> list of (entry, fields_needed)
+            
             for entry in items:
                 symbol_entry = entry.get("symbol")
                 if not symbol_entry:
@@ -126,7 +116,8 @@ class MarketScreenerService:
                 needs_price = entry.get("price") is None
                 needs_close = entry.get("close") is None
                 needs_name = entry.get("name") is None
-                if not (needs_price or needs_close or needs_name):
+                needs_exchange = entry.get("exchange") is None
+                if not (needs_price or needs_close or needs_name or needs_exchange):
                     continue
 
                 # 1) Intentar usar caché de Mongo (market_symbols) si está actualizada hoy
@@ -136,9 +127,10 @@ class MarketScreenerService:
                 except Exception:
                     cached = None
 
+                cache_updated = False
                 if cached is not None and isinstance(getattr(cached, "updated_at", None), datetime):
                     try:
-                        if cached.updated_at.date() == datetime.utcnow().date():
+                        if cached.updated_at.date() == datetime.now(timezone.utc).date():
                             if needs_price and cached.price is not None:
                                 entry["price"] = cached.price
                                 needs_price = False
@@ -148,26 +140,57 @@ class MarketScreenerService:
                             if needs_name and cached.name:
                                 entry["name"] = cached.name
                                 needs_name = False
+                            if needs_exchange and cached.exchange:
+                                entry["exchange"] = cached.exchange
+                                needs_exchange = False
+                            cache_updated = True
                     except Exception:
                         # Si algo falla al validar la fecha, ignoramos la caché
                         pass
 
-                if not (needs_price or needs_close or needs_name):
-                    continue
+                # Si aún faltan datos después del caché, agregar a lista para enriquecer en lote
+                if not cache_updated and (needs_price or needs_close or needs_name or needs_exchange):
+                    fields_needed = []
+                    if needs_price:
+                        fields_needed.append("price")
+                    if needs_close:
+                        fields_needed.append("close")
+                    if needs_name:
+                        fields_needed.append("name")
+                    if needs_exchange:
+                        fields_needed.append("exchange")
+                    
+                    symbols_to_enrich.append(str(symbol_entry))
+                    enrichment_map[str(symbol_entry)] = (entry, fields_needed)
 
-                # 2) Si aún faltan datos, llamar a Alpaca para enriquecer
+            # 2) Obtener datos en lote desde Alpaca si hay símbolos pendientes
+            if symbols_to_enrich:
                 try:
-                    quote = alpaca_service.get_last_quote(str(symbol_entry), user=user)
-                    if needs_price and quote.get("price") is not None:
-                        entry["price"] = quote["price"]
-                    if needs_close and quote.get("close") is not None:
-                        entry["close"] = quote["close"]
-                    if needs_name and quote.get("name"):
-                        entry["name"] = quote["name"]
+                    batch_quotes = alpaca_service.get_multiple_quotes(symbols_to_enrich, user=user)
+                    
+                    for symbol, (entry, fields_needed) in enrichment_map.items():
+                        quote = batch_quotes.get(symbol)
+                        if not quote:
+                            continue
+                            
+                        if "price" in fields_needed and quote.get("price") is not None:
+                            entry["price"] = quote["price"]
+                        if "close" in fields_needed and quote.get("close") is not None:
+                            entry["close"] = quote["close"]
+                        if "name" in fields_needed and quote.get("name"):
+                            entry["name"] = quote["name"]
+                        if "exchange" in fields_needed and quote.get("exchange"):
+                            entry["exchange"] = quote["exchange"]
+                            
                 except AlpacaServiceException as e:
-                    logger.debug("No se pudo enriquecer precio de screener para %s: %s", symbol_entry, str(e))
+                    logger.debug("No se pudo enriquecer datos en lote para most actives: %s", str(e))
                 except Exception as e:  # pragma: no cover - defensivo
-                    logger.debug("Error inesperado enriqueciendo precio de screener para %s: %s", symbol_entry, str(e))
+                    logger.debug("Error inesperado enriqueciendo datos en lote para most actives: %s", str(e))
+
+            # Aplicar filtro por exchange si se especificó (después de enriquecer)
+            if exchange:
+                exchange_upper = exchange.upper()
+                items = [e for e in items if e.get("exchange") and e["exchange"].upper() == exchange_upper]
 
             # 3) Aplicar filtro de precio mínimo/máximo si se especifica
             if min_price is not None or max_price is not None:
@@ -202,6 +225,7 @@ class MarketScreenerService:
         market: str = "stocks",
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
+        exchange: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Obtiene los top market movers (ganadores y perdedores).
 
@@ -209,6 +233,7 @@ class MarketScreenerService:
             user: Usuario autenticado (para usar sus claves Alpaca si existen).
             top: Número de símbolos por lista (ganadores y perdedores).
             market: Mercado ("stocks" o "crypto").
+            exchange: Exchange para filtrar (NASDAQ, NYSE, AMEX).
 
         Returns:
             Dict con listas de gainers y losers.
@@ -234,45 +259,121 @@ class MarketScreenerService:
 
             gainers: List[Dict[str, Any]] = []
             for mover in getattr(result, "gainers", []):
-                close_value = getattr(mover, "prev_close", None)
-                if close_value is None:
-                    close_value = getattr(mover, "previous_close", None)
-                if close_value is None:
-                    close_value = getattr(mover, "close", None)
-
+                # Filtro por Exchange si se especifica (se aplicará después de enriquecer)
                 gainers.append(
                     {
                         "symbol": getattr(mover, "symbol", None),
                         "percent_change": getattr(mover, "percent_change", None),
                         "change": getattr(mover, "change", None),
                         "price": getattr(mover, "price", None),
-                        "close": close_value,
+                        "close": None,  # Se enriquecerá después
                         "direction": "gainer",
                         "market": market_enum.value if hasattr(market_enum, "value") else str(market_enum),
+                        "exchange": None,  # Se enriquecerá después
                         "last_updated": last_updated_iso,
                     }
                 )
 
             losers: List[Dict[str, Any]] = []
             for mover in getattr(result, "losers", []):
-                close_value = getattr(mover, "prev_close", None)
-                if close_value is None:
-                    close_value = getattr(mover, "previous_close", None)
-                if close_value is None:
-                    close_value = getattr(mover, "close", None)
-
+                # Filtro por Exchange si se especifica (se aplicará después de enriquecer)
                 losers.append(
                     {
                         "symbol": getattr(mover, "symbol", None),
                         "percent_change": getattr(mover, "percent_change", None),
                         "change": getattr(mover, "change", None),
                         "price": getattr(mover, "price", None),
-                        "close": close_value,
+                        "close": None,  # Se enriquecerá después
                         "direction": "loser",
                         "market": market_enum.value if hasattr(market_enum, "value") else str(market_enum),
+                        "exchange": None,  # Se enriquecerá después
                         "last_updated": last_updated_iso,
                     }
                 )
+
+            # Enriquecer datos adicionales (close, exchange, name) usando caché y Alpaca en lote
+            # Recolectar símbolos que necesitan enriquecimiento
+            symbols_to_enrich = []
+            enrichment_map = {}  # symbol -> list of (entry, fields_needed)
+            
+            for mover_list in [gainers, losers]:
+                for entry in mover_list:
+                    symbol_entry = entry.get("symbol")
+                    if not symbol_entry:
+                        continue
+
+                    needs_close = entry.get("close") is None
+                    needs_exchange = entry.get("exchange") is None
+                    needs_name = entry.get("name") is None
+                    
+                    if not (needs_close or needs_exchange or needs_name):
+                        continue
+
+                    # 1) Intentar usar caché de Mongo (market_symbols) si está actualizada hoy
+                    try:
+                        symbol_str = str(symbol_entry).strip().upper()
+                        cached = get_symbol_by_symbol(symbol_str)
+                    except Exception:
+                        cached = None
+
+                    cache_updated = False
+                    if cached is not None and isinstance(getattr(cached, "updated_at", None), datetime):
+                        try:
+                            if cached.updated_at.date() == datetime.now(timezone.utc).date():
+                                if needs_close and cached.close is not None:
+                                    entry["close"] = cached.close
+                                    needs_close = False
+                                if needs_exchange and cached.exchange:
+                                    entry["exchange"] = cached.exchange
+                                    needs_exchange = False
+                                if needs_name and cached.name:
+                                    entry["name"] = cached.name
+                                    needs_name = False
+                                cache_updated = True
+                        except Exception:
+                            # Si algo falla al validar la fecha, ignoramos la caché
+                            pass
+
+                    # Si aún faltan datos después del caché, agregar a lista para enriquecer en lote
+                    if not cache_updated and (needs_close or needs_exchange or needs_name):
+                        fields_needed = []
+                        if needs_close:
+                            fields_needed.append("close")
+                        if needs_exchange:
+                            fields_needed.append("exchange")
+                        if needs_name:
+                            fields_needed.append("name")
+                        
+                        symbols_to_enrich.append(str(symbol_entry))
+                        enrichment_map[str(symbol_entry)] = (entry, fields_needed)
+
+            # 2) Obtener datos en lote desde Alpaca si hay símbolos pendientes
+            if symbols_to_enrich:
+                try:
+                    batch_quotes = alpaca_service.get_multiple_quotes(symbols_to_enrich, user=user)
+                    
+                    for symbol, (entry, fields_needed) in enrichment_map.items():
+                        quote = batch_quotes.get(symbol)
+                        if not quote:
+                            continue
+                            
+                        if "close" in fields_needed and quote.get("close") is not None:
+                            entry["close"] = quote["close"]
+                        if "exchange" in fields_needed and quote.get("exchange"):
+                            entry["exchange"] = quote["exchange"]
+                        if "name" in fields_needed and quote.get("name"):
+                            entry["name"] = quote["name"]
+                            
+                except AlpacaServiceException as e:
+                    logger.debug("No se pudo enriquecer datos en lote para market movers: %s", str(e))
+                except Exception as e:  # pragma: no cover - defensivo
+                    logger.debug("Error inesperado enriqueciendo datos en lote para market movers: %s", str(e))
+
+            # Aplicar filtro por exchange si se especificó (después de enriquecer)
+            if exchange:
+                exchange_upper = exchange.upper()
+                gainers = [e for e in gainers if e.get("exchange") and e["exchange"].upper() == exchange_upper]
+                losers = [e for e in losers if e.get("exchange") and e["exchange"].upper() == exchange_upper]
 
             # Aplicar filtro de precio mínimo/máximo si se especifica
             if min_price is not None or max_price is not None:

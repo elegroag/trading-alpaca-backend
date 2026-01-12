@@ -89,17 +89,13 @@ class MarketSymbolService:
                 f"Error inesperado al sincronizar símbolo {sym}: {str(e)}"
             ) from e
 
-        # Obtener última barra diaria para volumen y trade_count
-        volume = None
-        trade_count = None
-        try:
-            bars = alpaca_service.get_bars(sym, timeframe="1D", limit=1, user=user)
-            if bars and len(bars) > 0:
-                last_bar = bars[-1]
-                volume = last_bar.get("volume")
-                trade_count = last_bar.get("trade_count")
-        except Exception as e:
-            logger.warning("No se pudo obtener barra diaria para %s: %s", sym, str(e))
+        # El snapshot ya incluye daily_bar y latest_trade.
+        # Ya no necesitamos llamar a get_bars por separado si el snapshot tiene la info.
+        volume = quote.get("volume")
+        trade_count = quote.get("trade_count")
+        
+        # Si por alguna razón no viniera en el quote (aunque get_last_quote lo intenta),
+        # solo entonces podríamos intentar un fallback, pero por ahora simplificamos.
 
         data: Dict[str, Any] = {
             "symbol": quote.get("symbol") or sym,

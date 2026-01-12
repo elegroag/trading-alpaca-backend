@@ -21,6 +21,7 @@ def register_screener_routes(app: Flask) -> None:
             by = request.args.get('by', 'volume').lower()
             top_param = request.args.get('limit', request.args.get('top', '10'))
             market = request.args.get('market', 'stocks').lower()
+            exchange = request.args.get('exchange')
             min_price_raw = request.args.get('min_price')
             max_price_raw = request.args.get('max_price')
 
@@ -52,6 +53,7 @@ def register_screener_routes(app: Flask) -> None:
                 market=market,
                 min_price=min_price,
                 max_price=max_price,
+                exchange=exchange,
             )
 
             # Alimentar colección de símbolos de mercado en segundo plano
@@ -77,6 +79,7 @@ def register_screener_routes(app: Flask) -> None:
         try:
             top_param = request.args.get('limit', request.args.get('top', '10'))
             market = request.args.get('market', 'stocks').lower()
+            exchange = request.args.get('exchange')
             min_price_raw = request.args.get('min_price')
             max_price_raw = request.args.get('max_price')
 
@@ -107,6 +110,7 @@ def register_screener_routes(app: Flask) -> None:
                 market=market,
                 min_price=min_price,
                 max_price=max_price,
+                exchange=exchange,
             )
 
             return jsonify({'success': True, 'data': data})

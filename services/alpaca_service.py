@@ -20,7 +20,7 @@ from alpaca.trading.requests import (
 )
 from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce
 from alpaca.data import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
+from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest, StockSnapshotRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from config import config
@@ -448,6 +448,64 @@ class AlpacaService:
             logger.error(f"Error al verificar si el activo {symbol} es fractionable: {str(e)}")
             return False
 
+    def get_assets(self, asset_class: str = 'us_equity', exchange: Optional[str] = None, user: Optional[User] = None) -> List[Dict[str, Any]]:
+        """
+        Obtiene activos filtrados por clase e intercambio.
+        """
+        try:
+            from alpaca.trading.requests import GetAssetsRequest
+            from alpaca.trading.enums import AssetClass
+            
+            client = self._get_trading_client_for_user(user)
+            params = GetAssetsRequest(asset_class=AssetClass(asset_class))
+            all_assets = client.get_all_assets(params)
+            
+            filtered = []
+            for a in all_assets:
+                if not a.tradable or a.status != 'active':
+                    continue
+                if exchange and a.exchange.value.upper() != exchange.upper():
+                    continue
+                
+                filtered.append({
+                    'symbol': a.symbol,
+                    'name': a.name,
+                    'exchange': a.exchange.value,
+                    'fractionable': getattr(a, 'fractionable', False)
+                })
+            return filtered
+        except Exception as e:
+            logger.error(f"Error al obtener activos: {str(e)}")
+            raise AlpacaServiceException(f"Error al obtener activos: {str(e)}")
+
+    def get_snapshots(self, symbols: List[str], user: Optional[User] = None) -> Dict[str, Any]:
+        """
+        Obtiene snapshots (datos en tiempo real) para múltiples símbolos.
+        """
+        try:
+            from alpaca.data.requests import StockSnapshotRequest
+            
+            data_client = self._get_data_client_for_user(user)
+            request_params = StockSnapshotRequest(symbol_or_symbols=symbols)
+            snapshots = data_client.get_stock_snapshot(request_params)
+            
+            result = {}
+            for symbol, snp in snapshots.items():
+                price = snp.latest_trade.price if snp.latest_trade else 0
+                open_price = snp.daily_bar.open if snp.daily_bar else price
+                daily_change_pct = ((price / open_price) - 1) * 100 if open_price > 0 else 0
+                
+                result[symbol] = {
+                    'price': price,
+                    'daily_change_pct': daily_change_pct,
+                    'volume': snp.daily_bar.volume if snp.daily_bar else 0,
+                    'timestamp': snp.latest_trade.timestamp.isoformat() if snp.latest_trade else None
+                }
+            return result
+        except Exception as e:
+            logger.error(f"Error al obtener snapshots: {str(e)}")
+            raise AlpacaServiceException(f"Error al obtener snapshots: {str(e)}")
+
     # ========================================================================
     # MÉTODOS DE DATOS DE MERCADO
     # ========================================================================
@@ -473,6 +531,7 @@ class AlpacaService:
 
             asset_name = None
             asset_class_str = None
+            asset_exchange_str = None
             asset_attributes: Optional[list[str]] = None
             try:
                 client = self._get_trading_client_for_user(user)
@@ -485,6 +544,14 @@ class AlpacaService:
                         asset_class.value
                         if hasattr(asset_class, "value")
                         else str(asset_class)
+                    )
+
+                asset_exchange = getattr(asset, "exchange", None)
+                if asset_exchange is not None:
+                    asset_exchange_str = (
+                        asset_exchange.value
+                        if hasattr(asset_exchange, "value")
+                        else str(asset_exchange)
                     )
 
                 attrs = getattr(asset, "attributes", None)
@@ -513,13 +580,31 @@ class AlpacaService:
             except Exception:
                 close_price = None
 
+            # Intentar obtener volumen y trade_count de la barra diaria del snapshot
+            volume = None
+            trade_count = None
+            try:
+                # Usamos snapshots para obtener datos más completos en una sola llamada
+                request_snapshot = StockSnapshotRequest(symbol_or_symbols=symbol)
+                snp_resp = data_client.get_stock_snapshot(request_snapshot)
+                if symbol in snp_resp:
+                    snp = snp_resp[symbol]
+                    if snp.daily_bar:
+                        volume = int(snp.daily_bar.volume)
+                        trade_count = int(snp.daily_bar.trade_count) if snp.daily_bar.trade_count else None
+            except Exception:
+                pass
+
             return {
                 'symbol': symbol,
                 'price': float(trade.price),
                 'close': close_price,
                 'size': trade.size,
+                'volume': volume,
+                'trade_count': trade_count,
                 'timestamp': trade.timestamp.isoformat() if trade.timestamp else None,
                 'name': asset_name,
+                'exchange': asset_exchange_str,
                 'asset_class': asset_class_str,
                 'asset_attributes': asset_attributes,
             }
@@ -529,6 +614,101 @@ class AlpacaService:
         except Exception as e:
             logger.error(f"Error inesperado al obtener cotización {symbol}: {str(e)}")
             raise AlpacaServiceException(f"Error inesperado: {str(e)}")
+
+    def get_multiple_quotes(self, symbols: List[str], user: Optional[User] = None) -> Dict[str, Dict[str, Any]]:
+        """
+        Obtiene cotizaciones múltiples en lote para mejor rendimiento.
+
+        Args:
+            symbols: Lista de símbolos a consultar
+            user: Usuario autenticado (para usar sus claves si existen)
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Diccionario con cotizaciones por símbolo
+
+        Raises:
+            AlpacaServiceException: Si hay un error al obtener las cotizaciones
+        """
+        try:
+            if not symbols:
+                return {}
+
+            # Dividir en chunks de 250 (límite recomendado por Alpaca)
+            chunk_size = 250
+            all_quotes = {}
+
+            for i in range(0, len(symbols), chunk_size):
+                chunk = symbols[i:i + chunk_size]
+                
+                try:
+                    # Usar snapshots para obtener datos en lote
+                    request = StockSnapshotRequest(symbol_or_symbols=chunk)
+                    data_client = self._get_data_client_for_user(user)
+                    snapshots = data_client.get_stock_snapshot(request)
+
+                    # Procesar cada snapshot
+                    for symbol, snapshot in snapshots.items():
+                        try:
+                            # Obtener información adicional del asset
+                            asset_name = None
+                            asset_exchange_str = None
+                            asset_class_str = None
+                            
+                            try:
+                                client = self._get_trading_client_for_user(user)
+                                asset = client.get_asset(symbol_or_asset_id=symbol)
+                                asset_name = getattr(asset, "name", None)
+                                
+                                asset_exchange = getattr(asset, "exchange", None)
+                                if asset_exchange is not None:
+                                    asset_exchange_str = (
+                                        asset_exchange.value
+                                        if hasattr(asset_exchange, "value")
+                                        else str(asset_exchange)
+                                    )
+                                
+                                asset_class = getattr(asset, "asset_class", None)
+                                if asset_class is not None:
+                                    asset_class_str = (
+                                        asset_class.value
+                                        if hasattr(asset_class, "value")
+                                        else str(asset_class)
+                                    )
+                            except Exception:
+                                # Si falla el asset, continuamos con datos básicos
+                                pass
+
+                            # Calcular precio de cierre desde daily_bar
+                            close_price = None
+                            if hasattr(snapshot, 'daily_bar') and snapshot.daily_bar:
+                                close_price = float(snapshot.daily_bar.close)
+
+                            all_quotes[symbol] = {
+                                'symbol': symbol,
+                                'price': float(snapshot.latest_trade.price) if snapshot.latest_trade else None,
+                                'close': close_price,
+                                'size': snapshot.latest_trade.size if snapshot.latest_trade else None,
+                                'timestamp': snapshot.latest_trade.timestamp.isoformat() if snapshot.latest_trade and snapshot.latest_trade.timestamp else None,
+                                'name': asset_name,
+                                'exchange': asset_exchange_str,
+                                'asset_class': asset_class_str,
+                            }
+                        except Exception as e:
+                            logger.debug(f"Error procesando snapshot para {symbol}: {str(e)}")
+                            continue
+
+                except APIError as e:
+                    logger.error(f"Error API de Alpaca al obtener snapshots chunk {i//chunk_size + 1}: {str(e)}")
+                    # Continuar con el siguiente chunk en lugar de fallar completamente
+                    continue
+                except Exception as e:
+                    logger.error(f"Error inesperado al obtener snapshots chunk {i//chunk_size + 1}: {str(e)}")
+                    continue
+
+            return all_quotes
+        except Exception as e:
+            logger.error(f"Error general al obtener múltiples cotizaciones: {str(e)}")
+            raise AlpacaServiceException(f"Error al obtener múltiples cotizaciones: {str(e)}")
 
     def get_bars(self, symbol: str, timeframe: str = '1D', limit: int = 200, user: Optional[User] = None) -> List[Dict[str, Any]]:
         """
@@ -562,11 +742,9 @@ class AlpacaService:
                     raise AlpacaServiceException(f"Timeframe no soportado: {timeframe}")
                 tf_obj = TimeFrame(amount, TimeFrameUnit.Minute)
                 total_minutes = amount * effective_limit
-                # Para timeframes intradía, usamos al menos una ventana de 1 día
-                # para poder encontrar barras recientes aunque en el momento actual
-                # el mercado esté cerrado y no haya datos en los últimos minutos.
-                min_window = timedelta(days=1)
-                dynamic_window = timedelta(minutes=total_minutes * 2)
+                # Aumentar ventana a 7 días para cubrir fines de semana largos y feriados
+                min_window = timedelta(days=7)
+                dynamic_window = timedelta(minutes=total_minutes * 3)
                 window = max(min_window, dynamic_window)
                 start = datetime.utcnow() - window
             elif tf_str.endswith('H'):
@@ -590,7 +768,8 @@ class AlpacaService:
                     raise AlpacaServiceException(f"Timeframe no soportado: {timeframe}")
                 tf_obj = TimeFrame(amount, TimeFrameUnit.Day)
                 total_days = amount * effective_limit
-                start = datetime.utcnow() - timedelta(days=total_days * 2)
+                # Ventana de 10 días para asegurar barras diarias incluso tras periodos sin mercado
+                start = datetime.utcnow() - timedelta(days=max(10, total_days * 3))
             elif tf_str.endswith('W'):
                 effective_limit = min(requested_limit, config.MAX_BARS_DAY)
                 try:
